@@ -36,25 +36,25 @@ function pirateify(text) {
   if (!text) return text;
   let t = text;
   const replacements = [
-    [/\byou\b/gi, "ye"],
-    [/\byour\b/gi, "yer"],
-    [/\bcoach\b/gi, "capt'n"],
-    [/\bcoaches\b/gi, "capt'ns"],
-    [/\bplayer\b/gi, "matey"],
-    [/\bplayers\b/gi, "mateys"],
-    [/\bfriend\b/gi, "matey"],
-    [/\bfriends\b/gi, "mateys"],
-    [/\bleg\b/gi, "sea leg"],
-    [/\blegs\b/gi, "sea legs"],
-    [/\bknee\b/gi, "knee o' the sea"],
-    [/\bball\b/gi, "cannonball"],
-    [/\brun\b/gi, "sail"],
-    [/\brunning\b/gi, "sailing"],
-    [/\bruns\b/gi, "voyages"],
-    [/\bhips\b/gi, "hip bones"],
-    [/\bhold\b/gi, "grip"],
-    [/\bexercise\b/gi, "drill"],
-    [/\bexercises\b/gi, "drills"]
+    [/you/gi, "ye"],
+    [/your/gi, "yer"],
+    [/coach/gi, "capt'n"],
+    [/coaches/gi, "capt'ns"],
+    [/player/gi, "matey"],
+    [/players/gi, "mateys"],
+    [/friend/gi, "matey"],
+    [/friends/gi, "mateys"],
+    [/leg/gi, "sea leg"],
+    [/legs/gi, "sea legs"],
+    [/knee/gi, "knee o' the sea"],
+    [/ball/gi, "cannonball"],
+    [/run/gi, "sail"],
+    [/running/gi, "sailing"],
+    [/runs/gi, "voyages"],
+    [/hips/gi, "hip bones"],
+    [/hold/gi, "grip"],
+    [/exercise/gi, "drill"],
+    [/exercises/gi, "drills"]
   ];
   for (const [regex, repl] of replacements) {
     t = t.replace(regex, repl);
@@ -152,8 +152,8 @@ function renderExerciseList(filter = "") {
 function setCurrentIndex(index) {
   if (index < 0 || index >= exercises.length) return;
 
-  // IMPORTANT: stop timer when switching exercises
-  stopTimer();
+  // Stop and fully reset timer when switching exercises
+  stopTimer(true);
 
   currentIndex = index;
   currentLevelIndex = 0;
@@ -162,6 +162,9 @@ function setCurrentIndex(index) {
 }
 
 function renderCurrentExercise() {
+  // Extra safety: ensure any stray timer is stopped whenever we re-render
+  stopTimer(true);
+
   const { ex, level } = getActiveExerciseAndLevel();
 
   currentTitleEl.textContent = tt(ex.name);
@@ -229,8 +232,8 @@ function renderCurrentExercise() {
 
       card.addEventListener("click", () => {
         currentLevelIndex = idx;
-        // IMPORTANT: stop & reset timer when switching levels
-        stopTimer();
+        // Stop and reset timer when switching levels
+        stopTimer(true);
         renderCurrentExercise();
       });
 
@@ -305,7 +308,7 @@ function initTimerForCurrentLevel() {
     timerStartPauseBtn.textContent = tt("Start");
   } else {
     timerCard.style.display = "none";
-    stopTimer();
+    stopTimer(true);
   }
 }
 
@@ -323,7 +326,7 @@ function startTimer() {
     if (timerRemaining <= 1) {
       timerRemaining = 0;
       updateTimerDisplay();
-      stopTimer();
+      stopTimer(false);
       return;
     }
     timerRemaining -= 1;
@@ -338,20 +341,28 @@ function pauseTimer() {
     timerInterval = null;
   }
 }
-function stopTimer() {
-  timerRunning = false;
+function stopTimer(resetToDuration) {
+  // Clear any running interval and mark as not running
   if (timerInterval) {
     clearInterval(timerInterval);
     timerInterval = null;
   }
+  timerRunning = false;
+
+  if (resetToDuration) {
+    const { level } = getActiveExerciseAndLevel();
+    const duration = level && level.durationSeconds ? level.durationSeconds : 0;
+    timerRemaining = duration;
+    if (typeof updateTimerDisplay === "function") {
+      updateTimerDisplay();
+    }
+    if (timerStartPauseBtn) {
+      timerStartPauseBtn.textContent = tt("Start");
+    }
+  }
 }
 function resetTimer() {
-  const { level } = getActiveExerciseAndLevel();
-  const duration = level.durationSeconds || 0;
-  timerRemaining = duration;
-  stopTimer();
-  updateTimerDisplay();
-  timerStartPauseBtn.textContent = tt("Start");
+  stopTimer(true);
 }
 
 // ------------------ Events ------------------
