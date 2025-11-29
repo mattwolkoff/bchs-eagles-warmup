@@ -151,6 +151,10 @@ function renderExerciseList(filter = "") {
 
 function setCurrentIndex(index) {
   if (index < 0 || index >= exercises.length) return;
+
+  // IMPORTANT: stop timer when switching exercises
+  stopTimer();
+
   currentIndex = index;
   currentLevelIndex = 0;
   renderExerciseList(searchInput.value);
@@ -225,9 +229,8 @@ function renderCurrentExercise() {
 
       card.addEventListener("click", () => {
         currentLevelIndex = idx;
+        // IMPORTANT: stop & reset timer when switching levels
         stopTimer();
-        initTimerForCurrentLevel();
-        initSetsForCurrentLevel();
         renderCurrentExercise();
       });
 
@@ -235,7 +238,7 @@ function renderCurrentExercise() {
     });
   }
 
-  // Sets & timer
+  // Sets & timer for active level
   initSetsForCurrentLevel();
   initTimerForCurrentLevel();
 
