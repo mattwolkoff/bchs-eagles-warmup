@@ -13,6 +13,12 @@ let timerRemaining = 0;
 let timerRunning = false;
 let pirateMode = false;
 
+const PART_FILTER_DEFAULT = { "1": true, "2": true, "3": true };
+let activePartsFilter = { ...PART_FILTER_DEFAULT };
+let partCollapseState = { "1": false, "2": false, "3": false };
+let gameDayMode = false;
+
+
 const SETS_KEY = "fifa11_sets_progress_v2";
 let setsState = {};
 
@@ -92,6 +98,14 @@ const timerResetBtn = document.getElementById("timerResetBtn");
 const timerCard = document.getElementById("timerCard");
 const setsCard = document.getElementById("setsCard");
 
+const filterPart1Btn = document.getElementById("filterPart1Btn");
+const filterPart2Btn = document.getElementById("filterPart2Btn");
+const filterPart3Btn = document.getElementById("filterPart3Btn");
+const gameDayToggleBtn = document.getElementById("gameDayToggleBtn");
+
+const timerPopupEl = document.getElementById("timerPopup");
+const timerPopupDismissBtn = document.getElementById("timerPopupDismissBtn");
+
 const prevCard = document.getElementById("prevCard");
 const nextCard = document.getElementById("nextCard");
 const prevTitleEl = document.getElementById("prevTitle");
@@ -100,6 +114,14 @@ const prevLabelEl = document.getElementById("prevLabel");
 const nextLabelEl = document.getElementById("nextLabel");
 
 // ------------------ Helpers ------------------
+function getExercisePartNumber(ex) {
+  if (!ex || !ex.part) return null;
+  if (ex.part.startsWith("Part 1")) return "1";
+  if (ex.part.startsWith("Part 2")) return "2";
+  if (ex.part.startsWith("Part 3")) return "3";
+  return null;
+}
+
 function getActiveExerciseAndLevel() {
   const ex = exercises[currentIndex];
   const level =
@@ -107,47 +129,198 @@ function getActiveExerciseAndLevel() {
   return { ex, level };
 }
 
+function getFilteredExerciseIndices() {
+  const result = [];
+  exercises.forEach((ex, idx) => {
+    const partNum = getExercisePartNumber(ex);
+    if (partNum && activePartsFilter[partNum]) {
+      result.push(idx);
+    }
+  });
+  return result;
+}
+
+function ensureCurrentIndexInActiveParts() {
+  const filtered = getFilteredExerciseIndices();
+  if (filtered.length === 0) return;
+  if (!filtered.includes(currentIndex)) {
+    currentIndex = filtered[0];
+    currentLevelIndex = 0;
+  }
+}
+
+function getPrevNextExerciseIndices() {
+  const filtered = getFilteredExerciseIndices();
+  const pos = filtered.indexOf(currentIndex);
+  return {
+    prevIndex: pos > 0 ? filtered[pos - 1] : null,
+    nextIndex: pos >= 0 && pos < filtered.length - 1 ? filtered[pos + 1] : null,
+  };
+}
+
+function updatePartFilterButtonStates() {
+  if (filterPart1Btn) {
+    filterPart1Btn.classList.toggle("active", !!activePartsFilter["1"]);
+  }
+  if (filterPart2Btn) {
+    filterPart2Btn.classList.toggle("active", !!activePartsFilter["2"]);
+  }
+  if (filterPart3Btn) {
+    filterPart3Btn.classList.toggle("active", !!activePartsFilter["3"]);
+  }
+  if (gameDayToggleBtn) {
+    gameDayToggleBtn.classList.toggle("active", !!gameDayMode);
+  }
+}
+
+function setGameDayMode(on) {
+  gameDayMode = !!on;
+  if (gameDayMode) {
+    activePartsFilter = { "1": true, "2": false, "3": true };
+  } else {
+    activePartsFilter = { ...PART_FILTER_DEFAULT };
+  }
+  updatePartFilterButtonStates();
+  ensureCurrentIndexInActiveParts();
+  renderExerciseList(searchInput.value);
+  renderCurrentExercise();
+}
+
+function togglePartFilter(partNum) {
+  if (!["1", "2", "3"].includes(partNum)) return;
+  // If game day mode is on, turning individual filters changes it back to manual mode
+  if (gameDayMode) {
+    gameDayMode = false;
+  }
+  const currentlyOn = !!activePartsFilter[partNum];
+  const activeCount = Object.values(activePartsFilter).filter(Boolean).length;
+  // Prevent turning off the last active part
+  if (currentlyOn && activeCount === 1) {
+    return;
+  }
+  activePartsFilter[partNum] = !currentlyOn;
+  updatePartFilterButtonStates();
+  ensureCurrentIndexInActiveParts();
+  renderExerciseList(searchInput.value);
+  renderCurrentExercise();
+}
+
+function showTimerCompletePopup() {
+  if (!timerPopupEl) return;
+  timerPopupEl.classList.add("visible");
+}
+
+function hideTimerCompletePopup() {
+  if (!timerPopupEl) return;
+  timerPopupEl.classList.remove("visible");
+}
+
 // ------------------ Rendering ------------------
 function renderExerciseList(filter = "") {
   exerciseListEl.innerHTML = "";
   const query = filter.trim().toLowerCase();
 
-  exercises.forEach((ex, index) => {
-    if (
-      query &&
-      !ex.name.toLowerCase().includes(query) &&
-      !ex.part.toLowerCase().includes(query)
-    ) {
+  const partsMeta = [
+    { num: "1", title: tt("Part 1 – Running exercises") },
+    { num: "2", title: tt("Part 2 – Strength / Core stability") },
+    { num: "3", title: tt("Part 3 – Running exercises") },
+  ];
+
+  partsMeta.forEach((meta) => {
+    if (!activePartsFilter[meta.num]) {
       return;
     }
 
-    const item = document.createElement("div");
-    item.className =
-      "exercise-item" + (index === currentIndex ? " active" : "");
+    const groupContainer = document.createElement("div");
+    groupContainer.className = "part-group";
 
-    const title = document.createElement("div");
-    title.className = "exercise-title";
-    title.textContent = tt(`${ex.id}. ${ex.name}`);
+    const header = document.createElement("button");
+    header.type = "button";
+    header.className =
+      "part-group-header" + (partCollapseState[meta.num] ? " collapsed" : "");
+    const titleSpan = document.createElement("span");
+    titleSpan.className = "part-group-title";
+    titleSpan.textContent = meta.title;
+    const toggleSpan = document.createElement("span");
+    toggleSpan.className = "part-group-toggle";
+    toggleSpan.textContent = "▾";
 
-    const part = document.createElement("div");
-    part.className = "exercise-part";
-    part.textContent = tt(ex.part);
+    header.appendChild(titleSpan);
+    header.appendChild(toggleSpan);
 
-    item.appendChild(title);
-    item.appendChild(part);
+    const listEl = document.createElement("div");
+    listEl.className = "part-group-list";
+    if (partCollapseState[meta.num]) {
+      listEl.style.display = "none";
+    }
 
-    item.addEventListener("click", () => {
-      setCurrentIndex(index);
-      if (window.innerWidth <= 800) {
-        sidebar.classList.remove("open");
+    let hasAny = false;
+
+    exercises.forEach((ex, index) => {
+      const partNum = getExercisePartNumber(ex);
+      if (partNum !== meta.num) return;
+
+      if (
+        query &&
+        !ex.name.toLowerCase().includes(query) &&
+        !ex.part.toLowerCase().includes(query)
+      ) {
+        return;
+      }
+
+      hasAny = true;
+
+      const item = document.createElement("div");
+      item.className =
+        "exercise-item" + (index === currentIndex ? " active" : "");
+
+      const title = document.createElement("div");
+      title.className = "exercise-title";
+      title.textContent = tt(`${ex.id}. ${ex.name}`);
+
+      const part = document.createElement("div");
+      part.className = "exercise-part";
+      part.textContent = tt(ex.part);
+
+      item.appendChild(title);
+      item.appendChild(part);
+
+      item.addEventListener("click", () => {
+        setCurrentIndex(index);
+        if (window.innerWidth <= 800) {
+          sidebar.classList.remove("open");
+        }
+      });
+
+      listEl.appendChild(item);
+    });
+
+    if (!hasAny) {
+      return;
+    }
+
+    header.addEventListener("click", () => {
+      const isCollapsed = !partCollapseState[meta.num];
+      partCollapseState[meta.num] = isCollapsed;
+      if (isCollapsed) {
+        header.classList.add("collapsed");
+        listEl.style.display = "none";
+      } else {
+        header.classList.remove("collapsed");
+        listEl.style.display = "";
       }
     });
 
-    exerciseListEl.appendChild(item);
+    groupContainer.appendChild(header);
+    groupContainer.appendChild(listEl);
+    exerciseListEl.appendChild(groupContainer);
   });
 
   sidebarTitleEl.textContent = tt("FIFA 11+ List");
+
+  updatePartFilterButtonStates();
 }
+
 
 function setCurrentIndex(index) {
   if (index < 0 || index >= exercises.length) return;
@@ -246,9 +419,9 @@ function renderCurrentExercise() {
   initTimerForCurrentLevel();
 
   // Navigation previews
-  const prevEx = currentIndex > 0 ? exercises[currentIndex - 1] : null;
-  const nextEx =
-    currentIndex < exercises.length - 1 ? exercises[currentIndex + 1] : null;
+  const { prevIndex, nextIndex } = getPrevNextExerciseIndices();
+  const prevEx = prevIndex != null ? exercises[prevIndex] : null;
+  const nextEx = nextIndex != null ? exercises[nextIndex] : null;
 
   if (prevEx) {
     prevCard.style.visibility = "visible";
@@ -327,6 +500,7 @@ function startTimer() {
       timerRemaining = 0;
       updateTimerDisplay();
       stopTimer(false);
+      showTimerCompletePopup();
       return;
     }
     timerRemaining -= 1;
@@ -348,6 +522,7 @@ function stopTimer(resetToDuration) {
     timerInterval = null;
   }
   timerRunning = false;
+  hideTimerCompletePopup();
 
   if (resetToDuration) {
     const { level } = getActiveExerciseAndLevel();
@@ -370,6 +545,33 @@ searchInput.addEventListener("input", () => {
   renderExerciseList(searchInput.value);
 });
 
+if (filterPart1Btn) {
+  filterPart1Btn.addEventListener("click", () => togglePartFilter("1"));
+}
+if (filterPart2Btn) {
+  filterPart2Btn.addEventListener("click", () => togglePartFilter("2"));
+}
+if (filterPart3Btn) {
+  filterPart3Btn.addEventListener("click", () => togglePartFilter("3"));
+}
+if (gameDayToggleBtn) {
+  gameDayToggleBtn.addEventListener("click", () => {
+    setGameDayMode(!gameDayMode);
+  });
+}
+if (timerPopupDismissBtn) {
+  timerPopupDismissBtn.addEventListener("click", () => {
+    hideTimerCompletePopup();
+  });
+}
+if (timerPopupEl) {
+  timerPopupEl.addEventListener("click", (e) => {
+    if (e.target === timerPopupEl) {
+      hideTimerCompletePopup();
+    }
+  });
+}
+
 timerStartPauseBtn.addEventListener("click", () => {
   const { level } = getActiveExerciseAndLevel();
   if (!level.durationSeconds || level.durationSeconds <= 0) return;
@@ -387,10 +589,16 @@ timerResetBtn.addEventListener("click", () => {
 });
 
 prevCard.addEventListener("click", () => {
-  setCurrentIndex(currentIndex - 1);
+  const { prevIndex } = getPrevNextExerciseIndices();
+  if (prevIndex != null) {
+    setCurrentIndex(prevIndex);
+  }
 });
 nextCard.addEventListener("click", () => {
-  setCurrentIndex(currentIndex + 1);
+  const { nextIndex } = getPrevNextExerciseIndices();
+  if (nextIndex != null) {
+    setCurrentIndex(nextIndex);
+  }
 });
 
 toggleSidebarBtn.addEventListener("click", () => {

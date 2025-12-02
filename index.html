@@ -15,6 +15,13 @@
     <div class="sidebar-search">
       <input type="text" id="searchInput" placeholder="Search exercises..." />
     </div>
+    <div class="sidebar-filters">
+      <div class="part-filter-buttons">
+        <button class="part-filter-btn" id="filterPart1Btn">Part 1</button>
+        <button class="part-filter-btn" id="filterPart2Btn">Part 2</button>
+        <button class="part-filter-btn" id="filterPart3Btn">Part 3</button>
+      </div>
+    </div>
     <div class="exercise-list" id="exerciseList"></div>
   </aside>
 
@@ -26,6 +33,7 @@
       </div>
       <div class="header-buttons">
         <button class="btn-secondary" id="resetSessionBtn">Reset session</button>
+        <button class="btn-secondary game-day-toggle" id="gameDayToggleBtn">Game day</button>
         <button class="btn-secondary" id="pirateToggleBtn">☠ Pirate mode</button>
         <button class="mobile-toggle btn-secondary" id="toggleSidebarBtn">
           ☰ List
@@ -84,6 +92,14 @@
       </div>
     </div>
   </main>
+</div>
+
+<div id="timerPopup" class="timer-popup">
+  <div class="timer-popup-content">
+    <h3 id="timerPopupTitle">Timer complete</h3>
+    <p id="timerPopupMessage">Nice work — this timer is done.</p>
+    <button class="btn-primary" id="timerPopupDismissBtn">Dismiss</button>
+  </div>
 </div>
 
 <!-- Load data first, then app logic -->
