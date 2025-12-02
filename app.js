@@ -540,6 +540,10 @@ function resetTimer() {
   stopTimer(true);
 }
 
+// ------------------ Events ------------------
+searchInput.addEventListener("input", () => {
+  renderExerciseList(searchInput.value);
+});
 
 if (filterPart1Btn) {
   filterPart1Btn.addEventListener("click", () => togglePartFilter("1"));
